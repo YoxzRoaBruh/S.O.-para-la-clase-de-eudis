@@ -1,0 +1,23 @@
+{
+    "archivos": {
+        "Documentos": [
+            {
+                "nombre": "notas.txt",
+                "icono": "📝",
+                "info": "12 KB"
+            },
+            {
+                "nombre": "Update.exe",
+                "icono": "🚀",
+                "info": "Ejecutable",
+                "ruta_real": "C:/Users/roayo/AppData/Local/Discord/Update.exe"
+            }
+        ],
+        "Imágenes": [],
+        "Proyectos": []
+    },
+    "apps_terceros": {},
+    "apps_host": {
+        "Update": "C:/Users/roayo/AppData/Local/Discord/Update.exe"
+    }
+}
