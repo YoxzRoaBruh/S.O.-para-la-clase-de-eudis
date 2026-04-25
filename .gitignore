@@ -1,0 +1,6 @@
+# Ignorar entorno de Python
+backend/venv/
+backend/__pycache__/
+
+# Ignorar librerías de Node.js
+frontend/node_modules/
