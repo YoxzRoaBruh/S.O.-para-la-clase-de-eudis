@@ -1,0 +1,20 @@
+{
+    "archivos": {
+        "Documentos": [
+            {
+                "nombre": "notas.txt",
+                "icono": "📝",
+                "info": "12 KB"
+            },
+            {
+                "nombre": "afdasfasf",
+                "icono": "📁",
+                "info": "Carpeta"
+            }
+        ],
+        "Imágenes": [],
+        "Proyectos": []
+    },
+    "apps_terceros": {},
+    "apps_host": {}
+}

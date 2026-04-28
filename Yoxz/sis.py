@@ -23,10 +23,13 @@ try:
 except ImportError:
     PSUTIL_DISPONIBLE = False
 
+# Configuraciones base de suavidad
 ctk.set_appearance_mode("dark")
 
 BG_COLOR = "#1E1E2E"       
 PANEL_COLOR = "#313244"    
+ACCENT_COLOR = "#89B4FA"   
+RAM_COLOR = "#A6E3A1"      
 TEXT_COLOR = "#CDD6F4"
 HOST_COLOR = "#F5C2E7"     
 
@@ -246,7 +249,7 @@ class AetherOS(ctk.CTk):
     def ejecutar_app(self, comando): self.cerrar_menu(); comando()
 
     # ==========================================
-    # NUEVO CENTRO DE CONTROL / TASK MANAGER
+    # CENTRO DE CONTROL / TASK MANAGER
     # ==========================================
     def abrir_centro_control(self):
         self.control, contenedor = self.crear_ventana_nativa("Administrador de Tareas - AetherOS", "1050x650")
@@ -279,7 +282,6 @@ class AetherOS(ctk.CTk):
         for w in self.main_ctrl.winfo_children(): w.destroy()
         
         if self.seccion_actual == "REND":
-            # Estructura estilo Windows: Sidebar interna + Gráfico central
             self.rend_izq = ctk.CTkFrame(self.main_ctrl, width=200, fg_color=PANEL_COLOR, corner_radius=15)
             self.rend_izq.pack(side="left", fill="y", padx=(0, 15)); self.rend_izq.pack_propagate(False)
             
@@ -308,14 +310,16 @@ class AetherOS(ctk.CTk):
         elif self.seccion_actual == "PROC":
             ctk.CTkLabel(self.main_ctrl, text="Procesos y Subprocesos Activos", font=("Arial", 24, "bold"), anchor="w").pack(fill="x", pady=(0, 10))
             
-            # Cabecera de tabla
             cab = ctk.CTkFrame(self.main_ctrl, fg_color="transparent")
             cab.pack(fill="x", padx=10)
-            ctk.CTkLabel(cab, text="Nombre", width=250, anchor="w", font=("Arial", 13, "bold")).pack(side="left")
-            ctk.CTkLabel(cab, text="PID", width=70, anchor="w", font=("Arial", 13, "bold")).pack(side="left")
-            ctk.CTkLabel(cab, text="Subprocesos", width=100, anchor="w", font=("Arial", 13, "bold")).pack(side="left")
-            ctk.CTkLabel(cab, text="Tipo", width=100, anchor="w", font=("Arial", 13, "bold")).pack(side="left")
-            ctk.CTkLabel(cab, text="Memoria", width=100, anchor="e", font=("Arial", 13, "bold")).pack(side="right")
+            ctk.CTkLabel(cab, text="Nombre", width=200, anchor="w", font=("Arial", 13, "bold")).pack(side="left")
+            ctk.CTkLabel(cab, text="PID", width=60, anchor="w", font=("Arial", 13, "bold")).pack(side="left")
+            ctk.CTkLabel(cab, text="Hilos", width=80, anchor="w", font=("Arial", 13, "bold")).pack(side="left")
+            ctk.CTkLabel(cab, text="Tipo", width=80, anchor="w", font=("Arial", 13, "bold")).pack(side="left")
+            
+            # Cabeceras para el botón y la memoria
+            ctk.CTkLabel(cab, text="Acción", width=80, anchor="e", font=("Arial", 13, "bold")).pack(side="right", padx=10)
+            ctk.CTkLabel(cab, text="Memoria", width=80, anchor="e", font=("Arial", 13, "bold")).pack(side="right", padx=10)
 
             self.scroll_proc = ctk.CTkScrollableFrame(self.main_ctrl, fg_color=PANEL_COLOR, corner_radius=15)
             self.scroll_proc.pack(fill="both", expand=True)
@@ -337,38 +341,48 @@ class AetherOS(ctk.CTk):
             btn.configure(fg_color="#45475A" if hw == hardware else "transparent")
         self.lbl_titulo_graf.configure(text=hardware)
 
+    # ==========================================
+    # LÓGICA DE MATAR PROCESOS (NUEVO)
+    # ==========================================
+    def matar_proceso(self, pid, nombre):
+        respuesta = mb.askyesno("Finalizar Tarea", f"¿Estás seguro de que deseas finalizar '{nombre}' (PID: {pid})?\n\nAdvertencia: Finalizar procesos del sistema puede causar inestabilidad temporal en tu PC.")
+        if respuesta:
+            try:
+                psutil.Process(pid).terminate()
+                mb.showinfo("Éxito", f"El proceso '{nombre}' ha sido finalizado correctamente.")
+            except psutil.NoSuchProcess:
+                mb.showwarning("Aviso", "El proceso ya no se está ejecutando.")
+            except psutil.AccessDenied:
+                mb.showerror("Acceso Denegado", f"Windows ha bloqueado la acción.\n\nNo tienes permisos de Administrador para finalizar '{nombre}'. Es probable que sea un proceso crítico del núcleo de Windows.")
+            except Exception as e:
+                mb.showerror("Error", f"No se pudo finalizar el proceso.\nDetalle: {e}")
+
     def actualizar_centro_control(self):
         if hasattr(self, 'control') and self.control.winfo_exists() and PSUTIL_DISPONIBLE:
-            # 1. Obtener Datos
             cpu = psutil.cpu_percent()
             ram = psutil.virtual_memory().percent
             disco = psutil.disk_usage('/').percent
-            gpu = random.randint(1, 15) # GPU simulada
+            gpu = random.randint(1, 15) 
             
-            # Red
             net_io = psutil.net_io_counters()
             cur_net = net_io.bytes_sent + net_io.bytes_recv
             kbps = ((cur_net - getattr(self, 'last_net_bytes', cur_net)) / 1024) * 8
             self.last_net_bytes = cur_net
-            red_act = min((kbps / 5000) * 100, 100) # Escala para el gráfico
+            red_act = min((kbps / 5000) * 100, 100) 
 
-            # 2. Guardar Historial
             for hw, val in [("CPU", cpu), ("RAM", ram), ("DISCO", disco), ("RED", red_act), ("GPU", gpu)]:
                 self.historial_rend[hw].pop(0)
                 self.historial_rend[hw].append(val)
 
-            # 3. Actualizar UI según pestaña
             if self.seccion_actual == "REND":
                 self.dibujar_grafico_unificado()
                 
-                # Actualizar textos de la barra lateral
                 self.botones_rend["CPU"].configure(text=f"🟦 CPU\n{cpu}%")
                 self.botones_rend["RAM"].configure(text=f"🟩 Memoria\n{ram}%")
                 self.botones_rend["DISCO"].configure(text=f"🟫 Disco (C:)\n{disco}%")
                 self.botones_rend["RED"].configure(text=f"🟨 Ethernet\n{int(kbps)} Kbps")
                 self.botones_rend["GPU"].configure(text=f"🟪 Video\n{gpu}%")
 
-                # Estadísticas inferiores
                 val_actual = {"CPU": cpu, "RAM": ram, "DISCO": disco, "RED": int(kbps), "GPU": gpu}[self.sub_seccion_rend]
                 lbl_1 = f"Uso: {val_actual}%" if self.sub_seccion_rend != "RED" else f"Tráfico: {val_actual} Kbps"
                 self.lbl_stat_1.configure(text=lbl_1)
@@ -382,25 +396,27 @@ class AetherOS(ctk.CTk):
             elif self.seccion_actual == "PROC":
                 for w in self.scroll_proc.winfo_children(): w.destroy()
                 
-                # Obtenemos procesos, ordenados por memoria
                 procesos = list(psutil.process_iter(['pid', 'name', 'memory_info', 'num_threads', 'username']))
                 procesos.sort(key=lambda x: x.info['memory_info'].rss if x.info.get('memory_info') else 0, reverse=True)
                 
                 for p in procesos[:25]:
                     f = ctk.CTkFrame(self.scroll_proc, fg_color="transparent"); f.pack(fill="x", pady=1)
                     
-                    # Detección de procesos de Windows vs Usuario
                     nombre = p.info['name'] or "Desconocido"
                     es_sys = "Sistema" if p.info.get('username') == 'NT AUTHORITY\\SYSTEM' or nombre.lower() in ['svchost.exe', 'system', 'registry', 'csrss.exe', 'smss.exe'] else "Usuario"
                     color_tipo = "#A6ADC8" if es_sys == "Sistema" else COLORES_REND["CPU"]
 
-                    ctk.CTkLabel(f, text=nombre[:25], width=250, anchor="w").pack(side="left")
-                    ctk.CTkLabel(f, text=str(p.info['pid']), width=70, anchor="w").pack(side="left")
-                    ctk.CTkLabel(f, text=str(p.info.get('num_threads', 0)), width=100, anchor="w").pack(side="left")
-                    ctk.CTkLabel(f, text=f"[{es_sys}]", width=100, anchor="w", text_color=color_tipo).pack(side="left")
+                    ctk.CTkLabel(f, text=nombre[:22], width=200, anchor="w").pack(side="left")
+                    ctk.CTkLabel(f, text=str(p.info['pid']), width=60, anchor="w").pack(side="left")
+                    ctk.CTkLabel(f, text=str(p.info.get('num_threads', 0)), width=80, anchor="w").pack(side="left")
+                    ctk.CTkLabel(f, text=f"[{es_sys}]", width=80, anchor="w", text_color=color_tipo).pack(side="left")
                     
+                    # BOTÓN FINALIZAR TAREA 
+                    btn_matar = ctk.CTkButton(f, text="Finalizar", width=70, height=24, fg_color="#F38BA8", hover_color="#E64553", text_color="#11111B", font=("Arial", 11, "bold"), command=lambda p_id=p.info['pid'], nom=nombre: self.matar_proceso(p_id, nom))
+                    btn_matar.pack(side="right", padx=10)
+
                     mem = p.info['memory_info'].rss / (1024**2) if p.info.get('memory_info') else 0
-                    ctk.CTkLabel(f, text=f"{mem:.1f} MB", text_color=COLORES_REND["RAM"], width=100, anchor="e").pack(side="right", padx=10)
+                    ctk.CTkLabel(f, text=f"{mem:.1f} MB", text_color=COLORES_REND["RAM"], width=80, anchor="e").pack(side="right", padx=10)
 
             self.after(1000, self.actualizar_centro_control)
 
@@ -432,12 +448,21 @@ class AetherOS(ctk.CTk):
                 self.img_ref = img; self.canvas_desk.itemconfig(self.fondo_id, image=self.img_ref)
             except: pass
 
+    # ==========================================
+    # EXPLORADOR DE ARCHIVOS 
+    # ==========================================
     def abrir_explorador(self):
         self.explorador, contenedor = self.crear_ventana_nativa("Archivos - AetherOS", "750x550")
         side = ctk.CTkFrame(contenedor, width=180, fg_color=PANEL_COLOR); side.pack(side="left", fill="y", padx=15, pady=15)
         main = ctk.CTkFrame(contenedor, fg_color="transparent"); main.pack(side="right", fill="both", expand=True)
         tool = ctk.CTkFrame(main, height=55, fg_color=PANEL_COLOR); tool.pack(fill="x", padx=15, pady=15)
-        self.lbl_ruta = ctk.CTkLabel(tool, text=f"📍 {self.carpeta_actual}", font=("Arial", 14, "bold")); self.lbl_ruta.pack(side="left", padx=20)
+        
+        btn_volver = ctk.CTkButton(tool, text="⬅️", width=40, fg_color="transparent", hover_color="#45475A", command=self.retroceder_carpeta)
+        btn_volver.pack(side="left", padx=(15, 5))
+        
+        self.lbl_ruta = ctk.CTkLabel(tool, text=f"📍 {self.carpeta_actual}", font=("Arial", 14, "bold"))
+        self.lbl_ruta.pack(side="left", padx=5)
+        
         self.panel_archivos = ctk.CTkScrollableFrame(main, fg_color=PANEL_COLOR); self.panel_archivos.pack(fill="both", expand=True, padx=15, pady=(0, 15))
         ctk.CTkButton(tool, text="➕ Carpeta", width=90, command=self.crear_carpeta).pack(side="right", padx=10)
         ctk.CTkButton(tool, text="⬆️ Subir", width=90, command=self.subir_archivo).pack(side="right", padx=5)
@@ -446,6 +471,12 @@ class AetherOS(ctk.CTk):
         self.refresh_files()
 
     def set_dir(self, d): self.carpeta_actual = d; self.lbl_ruta.configure(text=f"📍 {d}"); self.refresh_files()
+
+    def retroceder_carpeta(self):
+        if "/" in self.carpeta_actual:
+            partes = self.carpeta_actual.split("/")
+            nueva_ruta = "/".join(partes[:-1]) 
+            self.set_dir(nueva_ruta)
 
     def refresh_files(self):
         for w in self.panel_archivos.winfo_children(): w.destroy()
